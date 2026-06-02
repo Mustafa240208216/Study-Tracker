@@ -34,6 +34,72 @@
             align-items: center;
         }
 
+        /* Login UI Styling */
+        .auth-screen {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            min-height: 80vh;
+        }
+
+        .auth-card {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+
+        .auth-input {
+            width: 100%;
+            padding: 0.85rem;
+            background: #0f172a;
+            border: 1px solid var(--border-color);
+            color: white;
+            border-radius: 8px;
+            margin-bottom: 1.25rem;
+            outline: none;
+            font-size: 1rem;
+            transition: border-color 0.2s ease;
+        }
+
+        .auth-input:focus {
+            border-color: var(--accent-primary);
+        }
+
+        .btn-login {
+            background-color: var(--accent-primary);
+            color: white;
+            width: 100%;
+            padding: 0.85rem;
+            font-size: 1rem;
+        }
+        .btn-login:hover {
+            background-color: #4f46e5;
+            box-shadow: var(--glow);
+        }
+
+        .btn-logout {
+            background: transparent;
+            color: var(--accent-danger);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            font-size: 0.85rem;
+            margin-top: 1rem;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+        .btn-logout:hover {
+            background: rgba(239, 68, 68, 0.1);
+            cursor: pointer;
+        }
+
+        /* Core Tracker Grid Styles */
         .dashboard {
             width: 100%;
             max-width: 1100px;
@@ -197,7 +263,19 @@
 </head>
 <body>
 
-<div class="dashboard">
+<!-- SECTION 1: AUTHENTICATION LOCK SCREEN -->
+<div id="authContainer" class="auth-screen" style="display: none;">
+    <div class="auth-card">
+        <h2>System Locked</h2>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">Provide access credentials to manage system sessions</p>
+        <input type="email" id="authEmail" class="auth-input" placeholder="User Identifier (Email)">
+        <input type="password" id="authPassword" class="auth-input" placeholder="Access Key (Password)">
+        <button id="authBtn" class="btn-login">Unlock Workspace</button>
+    </div>
+</div>
+
+<!-- SECTION 2: WORKSPACE TRACKER DASHBOARD -->
+<div id="dashboardContainer" class="dashboard" style="display: none;">
     <div class="panel control-panel">
         <div>
             <h2>Session Timer</h2>
@@ -216,6 +294,7 @@
                 <option value="2">Session 2</option>
             </select>
             <button class="btn-assign" id="assignBtn" onclick="assignTime()">Log Session & Sync</button>
+            <button class="btn-logout" id="logoutBtn">Lock Workspace</button>
         </div>
     </div>
 
@@ -249,7 +328,7 @@
                     </thead>
                     <tbody id="logTableBody"></tbody>
                 </table>
-                <div id="emptyMessage" class="empty-msg">Fetching records from cloud...</div>
+                <div id="emptyMessage" class="empty-msg">Awaiting verification security pass...</div>
             </div>
         </div>
     </div>
@@ -257,16 +336,18 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, doc, setDoc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, doc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    // Imported Authentication Engine Modules
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-    // ⚠️ REPLACE THIS WITH YOUR FIREBASE PROJECT ID FROM STEP 1
     const firebaseConfig = {
         projectId: "my-study-log-7fa04" 
     };
 
-    // Initialize Firebase & Firestore
+    // Initialize Global Firebase Instantiations
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const auth = getAuth(app);
 
     // Global App States
     let timer;
@@ -275,7 +356,72 @@
     let isRunning = false;
     let dbData = {};
 
-    // Expose timer control functions globally so HTML buttons work
+    // ==========================================
+    // SECURITY TERMINAL ENGINE (AUTH CONTROLS)
+    // ==========================================
+    
+    // Monitors user runtime dynamic state adjustments
+    onAuthStateChanged(auth, (user) => {
+        const authContainer = document.getElementById("authContainer");
+        const dashboardContainer = document.getElementById("dashboardContainer");
+
+        if (user) {
+            // User Authorized: Clear passwords, show layout panels, crawl cloud logs
+            authContainer.style.display = "none";
+            dashboardContainer.style.display = "grid";
+            loadCloudData();
+        } else {
+            // User Unverified: Wipe internal state logs, show authentication window
+            stopTimer();
+            resetTimer();
+            dbData = {};
+            document.getElementById("logTableBody").innerHTML = "";
+            dashboardContainer.style.display = "none";
+            authContainer.style.display = "flex";
+        }
+    });
+
+    // Handle authentication form dispatch mechanics
+    document.getElementById("authBtn").addEventListener("click", () => {
+        const email = document.getElementById("authEmail").value;
+        const password = document.getElementById("authPassword").value;
+        const authBtn = document.getElementById("authBtn");
+
+        if (!email || !password) {
+            alert("Please supply both login identity fields.");
+            return;
+        }
+
+        authBtn.disabled = true;
+        authBtn.innerText = "Verifying Credentials...";
+
+        signInWithEmailAndPassword(auth, email, password)
+            .then(() => {
+                // Clear input form fields completely
+                document.getElementById("authEmail").value = "";
+                document.getElementById("authPassword").value = "";
+            })
+            .catch((error) => {
+                alert("Security Gateway Fail: Verification rejected.");
+                console.error("Auth mismatch detected: ", error.message);
+            })
+            .finally(() => {
+                authBtn.disabled = false;
+                authBtn.innerText = "Unlock Workspace";
+            });
+    });
+
+    // Manual lock script trigger
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+        signOut(auth).catch((error) => {
+            alert("Error terminating session runtime: " + error.message);
+        });
+    });
+
+    // ==========================================
+    // EXTANT RUNTIME ACTIONS (TRACKER APP ENGINE)
+    // ==========================================
+
     window.startTimer = function() {
         if (!isRunning) {
             isRunning = true;
@@ -312,8 +458,10 @@
         return [hrs, mins, secs].map(v => v < 10 ? "0" + v : v).join(":");
     }
 
-    // Pull database data from Firestore cloud right on startup
     async function loadCloudData() {
+        const emptyMsg = document.getElementById("emptyMessage");
+        if (emptyMsg) emptyMsg.innerText = "Fetching records from cloud...";
+        
         try {
             const querySnapshot = await getDocs(collection(db, "study_logs"));
             dbData = {};
@@ -324,11 +472,10 @@
             calculateMetrics();
         } catch (error) {
             console.error("Error loading cloud database: ", error);
-            document.getElementById("emptyMessage").innerText = "Failed to load database. Double-check your Project ID configuration.";
+            if (emptyMsg) emptyMsg.innerText = "Failed to load database. Ensure Firestore permissions reflect matching secure conditions.";
         }
     }
 
-    // Log tracking data safely to cloud
     window.assignTime = async function() {
         if (elapsedTime === 0) {
             alert("Please accumulate stopwatch time first!");
@@ -339,7 +486,6 @@
         assignBtn.disabled = true;
         assignBtn.innerText = "Syncing with Cloud...";
 
-        // Formatting a clean sorting string for the key: "YYYY-MM-DD"
         const now = new Date();
         const year = now.getFullYear();
         const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -348,7 +494,6 @@
 
         const targetSession = document.getElementById("sessionSelect").value;
 
-        // Fetch existing cloud entry for today if it exists to prevent accidental override data loss
         let currentS1 = dbData[dateKey]?.session1 || 0;
         let currentS2 = dbData[dateKey]?.session2 || 0;
 
@@ -356,7 +501,6 @@
         else currentS2 += elapsedTime;
 
         try {
-            // Write to Firestore database collection "study_logs" under document name formatted as date
             await setDoc(doc(db, "study_logs", dateKey), {
                 session1: currentS1,
                 session2: currentS2,
@@ -364,7 +508,6 @@
             });
 
             resetTimer();
-            // Pull updated dataset cleanly back down
             await loadCloudData();
         } catch (error) {
             alert("Cloud write error: " + error.message);
@@ -379,7 +522,6 @@
         const emptyMsg = document.getElementById("emptyMessage");
         tbody.innerHTML = "";
 
-        // Sort keys so newest dates appear first
         const sortedDays = Object.keys(dbData).sort((a, b) => b.localeCompare(a));
 
         if (sortedDays.length === 0) {
@@ -427,9 +569,6 @@
         document.getElementById("statMax").innerText = formatTime(maxTime);
         document.getElementById("statAvg").innerText = formatTime(avgTime);
     }
-
-    // Trigger immediate download check upon document initiation
-    loadCloudData();
 </script>
 </body>
 </html>
