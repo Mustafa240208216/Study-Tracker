@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Permanent Session Tracker</title>
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            --panel-bg: rgba(30, 41, 59, 0.7);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-primary: #6366f1;
+            --accent-success: #10b981;
+            --accent-danger: #ef4444;
+            --glow: 0 0 20px rgba(99, 102, 241, 0.2);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .dashboard {
+            width: 100%;
+            max-width: 1100px;
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 900px) {
+            .dashboard { grid-template-columns: 1fr; }
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .control-panel {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            text-align: center;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            letter-spacing: 0.5px;
+            background: linear-gradient(to right, #fff, var(--text-muted));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .stopwatch-display {
+            font-size: 3.5rem;
+            font-family: monospace;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: var(--glow);
+            margin: 2rem 0;
+            background: rgba(0,0,0,0.2);
+            padding: 1rem 2rem;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.05);
+            width: 100%;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.75rem;
+            width: 100%;
+            margin-bottom: 1.5rem;
+        }
+
+        button {
+            flex: 1;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-start { background-color: var(--accent-primary); color: white; }
+        .btn-start:hover:not(:disabled) { background-color: #4f46e5; box-shadow: var(--glow); }
+        .btn-stop { background-color: var(--accent-danger); color: white; }
+        .btn-stop:hover:not(:disabled) { background-color: #dc2626; }
+        
+        .assign-container {
+            width: 100%;
+            border-top: 1px solid var(--border-color);
+            padding-top: 1.5rem;
+        }
+
+        select {
+            width: 100%;
+            padding: 0.75rem;
+            background: #0f172a;
+            border: 1px solid var(--border-color);
+            color: white;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            outline: none;
+        }
+
+        .btn-assign { background-color: var(--accent-success); color: white; }
+        .btn-assign:hover:not(:disabled) { background-color: #059669; }
+
+        .main-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            padding: 1.25rem;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            max-height: 400px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th, td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+
+        tr:hover { background: rgba(255, 255, 255, 0.02); }
+        .empty-msg { text-align: center; color: var(--text-muted); padding: 2rem; }
+    </style>
+</head>
+<body>
+
+<div class="dashboard">
+    <div class="panel control-panel">
+        <div>
+            <h2>Session Timer</h2>
+            <div class="stopwatch-display" id="display">00:00:00</div>
+            <div class="btn-group">
+                <button class="btn-start" id="startBtn" onclick="startTimer()">Start</button>
+                <button class="btn-stop" id="stopBtn" onclick="stopTimer()">Stop</button>
+                <button style="background: #475569; color: white;" onclick="resetTimer()">Reset</button>
+            </div>
+        </div>
+
+        <div class="assign-container">
+            <h2 style="margin-bottom: 0.75rem;">Log Time To</h2>
+            <select id="sessionSelect">
+                <option value="1">Session 1</option>
+                <option value="2">Session 2</option>
+            </select>
+            <button class="btn-assign" id="assignBtn" onclick="assignTime()">Log Session & Sync</button>
+        </div>
+    </div>
+
+    <div class="main-panel">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Total Active Days</div>
+                <div class="stat-value" id="statDays">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Max Day Duration</div>
+                <div class="stat-value" id="statMax">00:00:00</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Avg Work / Day</div>
+                <div class="stat-value" id="statAvg">00:00:00</div>
+            </div>
+        </div>
+
+        <div class="panel" style="flex: 1;">
+            <h2>Cloud Work Log</h2>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Session 1</th>
+                            <th>Session 2</th>
+                            <th>Total Duration</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logTableBody"></tbody>
+                </table>
+                <div id="emptyMessage" class="empty-msg">Fetching records from cloud...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, doc, setDoc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // ⚠️ REPLACE THIS WITH YOUR FIREBASE PROJECT ID FROM STEP 1
+    const firebaseConfig = {
+        projectId: "my-study-log-7fa04" 
+    };
+
+    // Initialize Firebase & Firestore
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Global App States
+    let timer;
+    let startTime;
+    let elapsedTime = 0;
+    let isRunning = false;
+    let dbData = {};
+
+    // Expose timer control functions globally so HTML buttons work
+    window.startTimer = function() {
+        if (!isRunning) {
+            isRunning = true;
+            startTime = Date.now() - elapsedTime;
+            timer = setInterval(updateDisplay, 1000);
+        }
+    }
+
+    window.stopTimer = function() {
+        if (isRunning) {
+            isRunning = false;
+            clearInterval(timer);
+            elapsedTime = Date.now() - startTime;
+        }
+    }
+
+    window.resetTimer = function() {
+        stopTimer();
+        elapsedTime = 0;
+        document.getElementById("display").innerText = "00:00:00";
+    }
+
+    function updateDisplay() {
+        elapsedTime = Date.now() - startTime;
+        document.getElementById("display").innerText = formatTime(elapsedTime);
+    }
+
+    function formatTime(ms) {
+        if (!ms || ms === 0) return "00:00:00";
+        let totalSecs = Math.floor(ms / 1000);
+        let hrs = Math.floor(totalSecs / 3600);
+        let mins = Math.floor((totalSecs % 3600) / 60);
+        let secs = totalSecs % 60;
+        return [hrs, mins, secs].map(v => v < 10 ? "0" + v : v).join(":");
+    }
+
+    // Pull database data from Firestore cloud right on startup
+    async function loadCloudData() {
+        try {
+            const querySnapshot = await getDocs(collection(db, "study_logs"));
+            dbData = {};
+            querySnapshot.forEach((doc) => {
+                dbData[doc.id] = doc.data();
+            });
+            renderTable();
+            calculateMetrics();
+        } catch (error) {
+            console.error("Error loading cloud database: ", error);
+            document.getElementById("emptyMessage").innerText = "Failed to load database. Double-check your Project ID configuration.";
+        }
+    }
+
+    // Log tracking data safely to cloud
+    window.assignTime = async function() {
+        if (elapsedTime === 0) {
+            alert("Please accumulate stopwatch time first!");
+            return;
+        }
+
+        const assignBtn = document.getElementById("assignBtn");
+        assignBtn.disabled = true;
+        assignBtn.innerText = "Syncing with Cloud...";
+
+        // Formatting a clean sorting string for the key: "YYYY-MM-DD"
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const dateKey = `${year}-${month}-${day}`;
+
+        const targetSession = document.getElementById("sessionSelect").value;
+
+        // Fetch existing cloud entry for today if it exists to prevent accidental override data loss
+        let currentS1 = dbData[dateKey]?.session1 || 0;
+        let currentS2 = dbData[dateKey]?.session2 || 0;
+
+        if (targetSession === "1") currentS1 += elapsedTime;
+        else currentS2 += elapsedTime;
+
+        try {
+            // Write to Firestore database collection "study_logs" under document name formatted as date
+            await setDoc(doc(db, "study_logs", dateKey), {
+                session1: currentS1,
+                session2: currentS2,
+                timestamp: Date.now()
+            });
+
+            resetTimer();
+            // Pull updated dataset cleanly back down
+            await loadCloudData();
+        } catch (error) {
+            alert("Cloud write error: " + error.message);
+        } finally {
+            assignBtn.disabled = false;
+            assignBtn.innerText = "Log Session & Sync";
+        }
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById("logTableBody");
+        const emptyMsg = document.getElementById("emptyMessage");
+        tbody.innerHTML = "";
+
+        // Sort keys so newest dates appear first
+        const sortedDays = Object.keys(dbData).sort((a, b) => b.localeCompare(a));
+
+        if (sortedDays.length === 0) {
+            emptyMsg.style.display = "block";
+            emptyMsg.innerText = "No logs recorded yet. Start tracking your metrics!";
+            return;
+        } else {
+            emptyMsg.style.display = "none";
+        }
+
+        sortedDays.forEach(day => {
+            const s1 = dbData[day].session1 || 0;
+            const s2 = dbData[day].session2 || 0;
+            const total = s1 + s2;
+
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td style="font-weight: 600; color: #cbd5e1;">${day}</td>
+                <td>${formatTime(s1)}</td>
+                <td>${formatTime(s2)}</td>
+                <td style="font-weight: 600; color: var(--accent-success);">${formatTime(total)}</td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    function calculateMetrics() {
+        const days = Object.keys(dbData);
+        const totalDays = days.length;
+        
+        if (totalDays === 0) return;
+
+        let maxTime = 0;
+        let cumulativeSum = 0;
+
+        days.forEach(day => {
+            const dayTotal = (dbData[day].session1 || 0) + (dbData[day].session2 || 0);
+            cumulativeSum += dayTotal;
+            if (dayTotal > maxTime) maxTime = dayTotal;
+        });
+
+        const avgTime = Math.floor(cumulativeSum / totalDays);
+
+        document.getElementById("statDays").innerText = totalDays;
+        document.getElementById("statMax").innerText = formatTime(maxTime);
+        document.getElementById("statAvg").innerText = formatTime(avgTime);
+    }
+
+    // Trigger immediate download check upon document initiation
+    loadCloudData();
+</script>
+</body>
+</html>
